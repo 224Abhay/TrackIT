@@ -17,11 +17,11 @@ else:
     last_sent = {}
 
 def run_scheduler():
-    for schedule_file_name in os.listdir(SCHEDULES_FOLDER):
+    for schedule_file_name in os.listdir(SCHEDULES_DIR):
         if schedule_file_name.endswith(".json"):
             if schedule_file_name not in last_sent:
 
-                with open(os.path.join(SCHEDULES_FOLDER, schedule_file_name), "r") as f:
+                with open(os.path.join(SCHEDULES_DIR, schedule_file_name), "r") as f:
                     schedule = json.load(f)
 
                 data = get_info(*schedule["details_required"])
@@ -31,7 +31,7 @@ def run_scheduler():
 
             else:
                 if time.time() - last_sent[schedule_file_name]["last_sent"] > last_sent[schedule_file_name]["interval"]:
-                    with open(os.path.join(SCHEDULES_FOLDER, schedule_file_name), "r") as f:
+                    with open(os.path.join(SCHEDULES_DIR, schedule_file_name), "r") as f:
                         schedule = json.load(f)
 
                     data = get_info(*schedule["details_required"])
