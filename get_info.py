@@ -1,15 +1,17 @@
 import datetime
 import json
-import logging
 import os
 import subprocess
-import time
 from itertools import chain
-from typing import Dict, List, Any
 from urllib import request
 import winreg
 import psutil
 from subprocess import CREATE_NO_WINDOW
+
+MAIN_DIR = "C:/ProgramData/TrackIt"
+CONFIG_FILE = os.path.join(MAIN_DIR, "config.json")
+AVAILABLE_METHODS_FILE = os.path.join(MAIN_DIR, "available_methods.json")
+
 
 class HardwareInfo:
     @staticmethod
@@ -63,7 +65,7 @@ class HardwareInfo:
     def get_serial_number():
         try:
             command = 'Get-CimInstance Win32_BIOS | Select-Object -ExpandProperty SerialNumber'
-            output = subprocess.check_output(["powershell", "-Command", command], text=True, creationflags=subprocess.CREATE_NO_WINDOW).strip()
+            output = subprocess.check_output(["powershell", "-Command", command], text=True, creationflags=CREATE_NO_WINDOW).strip()
 
             return output if output else "Unknown"
 
@@ -81,7 +83,7 @@ class HardwareInfo:
             output = subprocess.check_output(
                 ["powershell", "-Command", command], 
                 text=True, 
-                creationflags=subprocess.CREATE_NO_WINDOW
+                creationflags=CREATE_NO_WINDOW
             ).strip()
 
             if not output:
@@ -114,7 +116,7 @@ class HardwareInfo:
     def get_cpu_details():
         try:
             command = "Get-WmiObject Win32_Processor | Select-Object Name, NumberOfCores, MaxClockSpeed | ConvertTo-Json"
-            output = subprocess.check_output(["powershell", "-Command", command], text=True, creationflags=subprocess.CREATE_NO_WINDOW)
+            output = subprocess.check_output(["powershell", "-Command", command], text=True, creationflags=CREATE_NO_WINDOW)
             data = json.loads(output)
             if isinstance(data, dict):
                 data = [data]
@@ -187,7 +189,7 @@ class HardwareInfo:
     def get_peripheral_devices():
         try:
             command = "Get-WmiObject Win32_PnPEntity | Where-Object {$_.Service -ne $null} | Select-Object Name, DeviceID | ConvertTo-Json"
-            output = subprocess.check_output(["powershell", "-Command", command], text=True, creationflags=subprocess.CREATE_NO_WINDOW)
+            output = subprocess.check_output(["powershell", "-Command", command], text=True, creationflags=CREATE_NO_WINDOW)
             data = json.loads(output)
             if isinstance(data, dict):
                 data = [data]
@@ -435,7 +437,7 @@ class NetworkInfo:
         except Exception:
             return "Unknown"
 
-    aviable_methods = {
+    available_methods = {
         "network_adapters": get_network_adapters,
         "public_ip": get_public_ip,
         "wifi_ssid": get_wifi_ssid,
@@ -467,7 +469,7 @@ class SecurityInfo:
         except Exception:
             return {"Unknown": False}
 
-    avaiable_methods = {
+    available_methods = {
         "antivirus": get_antivirus_details,
         "firewall": get_firewall_details
     }
@@ -517,7 +519,7 @@ class OtherInfo:
     @staticmethod
     def get_asset_tag():
         try:
-            with open("config.json", "r") as f:
+            with open(CONFIG_FILE, "r") as f:
                 return json.load(f)["asset_tag"]
         except FileNotFoundError:
             return "Not Assigned"
@@ -552,13 +554,21 @@ class OtherInfo:
             output = subprocess.check_output(
                 ["powershell", "-Command", command], 
                 text=True, 
-                creationflags=subprocess.CREATE_NO_WINDOW
+                creationflags=CREATE_NO_WINDOW
             ).strip()
 
             return output if output else "Unknown"
 
         except subprocess.CalledProcessError:
             return "Unknown"
+
+    available_methods = {
+        "cpu_usage": get_cpu_usage,
+        "asset_tag": get_asset_tag,
+        "last_boot_time": get_last_boot_time,
+        "battery_status": get_battery_status,
+        "windows_product_key": get_windows_product_key
+    }
 
 class UnusedInfo:
     @staticmethod
@@ -600,13 +610,23 @@ class UnusedInfo:
             return ["Unknown"]
         return usb_list
 
-    
-def get_info(*args):
-    available_methods = {
-        **HardwareInfo.available_methods
-    }
+available_methods = {
+    **HardwareInfo.available_methods,
+    **SoftwareInfo.available_methods,
+    **NetworkInfo.available_methods,
+    **SecurityInfo.available_methods,
+    **OtherInfo.available_methods,
+}
 
+if not os.path.exists(AVAILABLE_METHODS_FILE):
+    with open(AVAILABLE_METHODS_FILE, "w") as f:
+        json.dump(list(available_methods.keys()), f, indent=4)
+
+def get_info(*args):
     info = {}
+
+    if "all" in args:
+        args = list(available_methods.keys())
 
     for arg in args:
         if arg in available_methods:
